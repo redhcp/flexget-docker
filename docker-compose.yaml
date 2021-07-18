@@ -1,0 +1,98 @@
+version: "2.1"
+services:
+  transmission:
+    image: ghcr.io/linuxserver/transmission
+    container_name: transmission
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Argentina/Buenos_Aires
+      - USER=webuser
+      - PASS=webpass
+    volumes:
+      - $HOME/Games/transmission/config:/config
+      - $HOME/Games/transmission/downloads:/downloads
+      - $HOME/Games/transmission/watch:/tv
+    ports:
+      - 9091:9091
+      - 51413:51413
+      - 51413:51413/udp
+    networks:
+      static-network:
+        ipv4_address: 172.26.0.10
+    restart: always
+
+  flexget:
+    image: wiserain/flexget
+    container_name: flexget
+    volumes:
+      - $HOME/Games/transmission/flexget:/config
+      - $HOME/Games/transmission/downloads:/downloads
+    ports:
+      - 5050:5050
+    networks:
+      - static-network
+
+    environment:
+      - TORRENT_PLUGIN=transmission
+    restart: unless-stopped
+    links:
+      - transmission
+
+  samba:
+    image: dperson/samba
+    container_name: samba
+    environment:
+      - TZ=America/Argentina/Buenos_Aires
+    restart: always
+    command: '-u "vagrant:vagrant" -s "flexget;/flexget;yes;yes;yes" -s "torrents;/torrents;yes;yes;yes" -p -S'
+    stdin_open: true
+    tty: true
+    ports:
+      - 139:139
+      - 445:445
+    networks:
+      static-network:
+        ipv4_address: 172.26.0.4
+    volumes:
+      - $HOME/Games/transmission/downloads/:/torrents
+      - $HOME/Games/transmission/flexget:/flexget
+
+  sonarr:
+    image: linuxserver/sonarr
+    container_name: sonarr
+    restart: always
+    ports:
+      - 8989:8989
+    networks:
+      static-network:
+        ipv4_address: 172.26.0.3
+    environment:
+      - PGID=1000
+      - PUID=1000
+      - TZ=America/Argentina
+    volumes:
+      - $HOME/Games/transmission/sonarr/config:/config
+      - $HOME/Games/transmission/downloads:/downloads
+      - $HOME/Games/transmission/watch:/tv
+  jackett:
+    image: linuxserver/jackett
+    container_name: jackett
+    restart: always
+    environment:
+      - PGID=1000
+      - PUID=1000
+      - TZ=America/Argentina
+    volumes:
+      - $HOME/Games/transmission/jackett/config:/config
+      - $HOME/Games/transmission/downloads/complete:/downloads
+    ports:
+      - 9117:9117
+    networks:
+      static-network:
+        ipv4_address: 172.26.0.2
+networks:
+  static-network:
+    ipam:
+      config:
+        - subnet: 172.26.0.0/16

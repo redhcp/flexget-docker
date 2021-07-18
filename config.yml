@@ -1,0 +1,65 @@
+variables: secrets.yml
+
+web_server:
+  bind: 0.0.0.0
+  port: 5050
+  web_ui: yes
+
+schedules:
+  - tasks: "*"
+    interval:
+      minutes: 10
+
+tasks:
+  ##########
+  sort:
+    priority: 100
+    no_entries_ok: yes
+    parsing:
+      series: guessit
+    filesystem:
+      path: "{? folder.download_complete ?}"
+      regexp: '.*\.(avi|mkv|mp4)$'
+      recursive: yes
+    accept_all: yes
+    thetvdb_lookup: yes
+    require_field: series_name
+    all_series:
+      parse_only: yes
+    exec:
+      auto_escape: yes
+      on_output:
+        for_entries: |
+          mkdir -p "/home/cesar/Games/transmission/watch/{{ tvdb_series_name }}/Season {{ series_season }}" && mv "{{ location }}" "/home/cesar/Games/transmission/watch/{{ tvdb_series_name }}/Season {{ series_season }}/{{ tvdb_series_name }} - {{ series_id }}{{ location | pathext }}"
+  #########
+  remove_stale_torrents:
+    priority: 10
+    from_transmission:
+      host: 0.0.0.0
+      port: 9091
+      username: webuser
+      password: webpass
+    disable: [seen, seen_info_hash]
+    if:
+      - transmission_progress == 100: accept
+      # - transmission_ratio < 0.1: reject
+      # - not transmission_seed_ratio_ok: reject
+      # - not transmission_idle_limit_ok: reject
+      # - transmission_ratio < 3.0: reject
+    transmission:
+      host: 0.0.0.0
+      port: 9091
+      username: webuser
+      password: webpass
+      action: purge
+# CMD
+# flexget web passwd PASSWORD
+# flexget check
+# flexget --test execute
+# flexget daemon reload-config
+# flexget history
+# flexget series list
+# flexget series forget "SERIE"
+# sudo flexget --test execute --tasks "remove stale torrents" --dump
+# sudo flexget execute --tasks "remove_stale_torrents"
+# sudo rsync -avz --exclude "*.mkv" $HOME/Games/transmission $HOME/Documents
